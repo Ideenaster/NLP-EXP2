@@ -236,12 +236,13 @@ def main(args):
             target_names = []
             valid_report_label_ids = [] # 存储实际用于报告的标签ID
             for lid in report_label_ids:
-                tag_name = id2tag.get(lid)
-                if tag_name is not None:
+                if 0 <= lid < len(id2tag):
+                    tag_name = id2tag[lid]
                     target_names.append(tag_name)
                     valid_report_label_ids.append(lid)
                 else:
-                    logging.warning(f"Label ID {lid} not found in id2tag mapping. It will be excluded from target_names in report.")
+                    # tag_name = None # Explicitly set to None if out of bounds, though not used if not appended
+                    logging.warning(f"Label ID {lid} not found in id2tag mapping (index out of bounds for list). It will be excluded from target_names in report.")
 
             if not valid_report_label_ids:
                 logging.warning(f"Epoch {epoch} Evaluation: No valid target names found for metrics calculation after id2tag mapping.")

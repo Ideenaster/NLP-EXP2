@@ -60,17 +60,16 @@ class BertCWS(nn.Module): # Renamed class
             # 2. Create a CRF-specific mask
             #    This mask considers both padding (from attention_mask)
             #    and positions where the original label was ignore_label_id.
-            #    torchcrf historically preferred ByteTensor, but BoolTensor might also work.
-            #    Using .byte() for broader compatibility.
-            crf_specific_mask = attention_mask.byte()
+            #    Using .bool() as PyTorch recommends boolean condition tensors.
+            crf_specific_mask = attention_mask.bool()
             # Mask out positions where the original label was ignore_label_id
-            crf_specific_mask[labels == self.ignore_label_id] = 0
+            crf_specific_mask[labels == self.ignore_label_id] = False # Use False for boolean mask
             
             # Ensure the first timestep's mask is on, as required by torchcrf
             # The [CLS] token's label might be ignore_label_id, which would turn off its mask.
             # We need to ensure it's on for CRF validation.
             if crf_specific_mask.size(1) > 0: # Check if sequence length is greater than 0
-                crf_specific_mask[:, 0] = 1
+                crf_specific_mask[:, 0] = True # Use True for boolean mask
             
             loss = -self.crf(emissions, crf_labels, mask=crf_specific_mask, reduction='mean')
         
