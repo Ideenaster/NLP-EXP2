@@ -5,7 +5,7 @@ from torch.nn.utils.rnn import pad_sequence
 from transformers import BertTokenizer
 
 # 使用 'bert-base-chinese' 作为预训练模型
-BERT_MODEL_NAME = 'bert-base-chinese'
+BERT_MODEL_NAME = 'swtx/ernie-3.0-base-chinese'
 
 class SentenceDataset(Dataset):
     def __init__(self, sentences, tags, tag2id, tokenizer_name=BERT_MODEL_NAME, max_len=128):
