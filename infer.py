@@ -18,6 +18,9 @@ def load_id2tag(datasave_path):
         id2tag = pickle.load(inp)
     return id2tag
 
+# 定义要调试的目标句子
+# DEBUG_SENTENCE = "２０１３年，成都金沙遗址博物馆与百度百科强强联手，共同打造了数字化、立体化的权威知识普及平台：成都金沙遗址博物馆之百科数字博物馆。该数字馆通过重要遗迹、藏品精粹、文化景观等分馆，全方位展示了成都金沙遗址博物馆的众多珍贵展品。"
+
 def infer(args):
     device = get_device(args.device)
     print(f"Using device: {device}")
@@ -117,6 +120,14 @@ def infer(args):
             
             # 获取原始文本的字符
             original_chars = list(sentence)
+
+            # if sentence == DEBUG_SENTENCE:
+            #     print("-" * 50)
+            #     print(f"DEBUGGING SENTENCE: {sentence}")
+            #     print(f"Tokens (from Tokenizer): {tokenizer.convert_ids_to_tokens(input_ids.squeeze(0).tolist())}")
+            #     print(f"Predicted Subword Tags: {predicted_tags}")
+            #     print(f"Offset Mapping: {offset_mapping}")
+            
             # print(f"Original: {sentence}")
             # print(f"Tokens: {tokenizer.convert_ids_to_tokens(input_ids.squeeze(0).tolist())}")
             # print(f"Tags: {predicted_tags}")
@@ -130,28 +141,56 @@ def infer(args):
             # word_ids() 方法可以帮助将 token 映射回原始单词索引
             # encoding.word_ids() 会返回一个列表，每个 token 对应原始文本中的词（字符）索引
             # None 表示特殊 token
-            word_indices = encoding.word_ids(batch_index=0) # batch_index=0 因为我们处理单个句子
-            
-            # print(f"Word indices: {word_indices}")
+            # word_indices = encoding.word_ids(batch_index=0) # 旧的 word_ids 获取方式，将被替换
+            # if sentence == DEBUG_SENTENCE:
+            #     print(f"Word Indices (token to char mapping): {word_indices}") # 旧的打印
 
+            # 新的基于 offset_mapping 的对齐逻辑
             char_tags = ['O'] * len(sentence) # 初始化每个字符的标签为 'O' (Outside)
-            
-            # 将 token 标签映射到字符级别
-            # 对于一个字符，如果它被拆分为多个 subword token，我们通常关心第一个 subword token 的标签
-            # 或者，可以采用更复杂的策略，如投票或优先考虑 B/S 标签
-            
-            last_word_idx = -1
-            for token_idx, word_idx in enumerate(word_indices):
-                if word_idx is not None: # 非特殊 token
-                    # 我们只关心每个原始字符对应的第一个 token 的标签
-                    if word_idx != last_word_idx: 
-                        # 确保 token_idx 在 predicted_tags 的有效范围内
-                        # predicted_tags 对应于 input_ids 的长度，包括特殊token
-                        if token_idx < len(predicted_tags):
-                            char_tags[word_idx] = predicted_tags[token_idx]
-                    last_word_idx = word_idx
-            
-            # print(f"Char tags: {char_tags}")
+
+            # predicted_tags 是子词/token级别的BIES标签列表 (来自 line 109)
+            # offset_mapping 提供了每个token在原始句子中的 (start_char, end_char) (来自 line 98)
+
+            for i in range(len(predicted_tags)): # 遍历所有 token 的预测标签
+                # offset_mapping 已经通过 .tolist() 转换为列表
+                start_char, end_char = offset_mapping[i]
+
+                # 跳过特殊 tokens ([CLS], [SEP], [PAD]) 对应的 offset (通常是 (0,0) 对 CLS/SEP，或无效范围)
+                # 或者实际字符范围无效的
+                if start_char == end_char or end_char <= start_char:
+                    continue
+
+                tag = predicted_tags[i] # 当前 token 的 BIES 标签
+                
+                num_chars_in_token = end_char - start_char
+
+                if num_chars_in_token == 1:
+                    # Token 覆盖单个字符，直接使用token的标签
+                    char_tags[start_char] = tag
+                else: # Token 覆盖多个字符
+                    if tag == 'S': # 模型预测一个多字符token为S，将其视为一个独立的BME词
+                        char_tags[start_char] = 'B'
+                        for k_char_idx in range(start_char + 1, end_char - 1):
+                            char_tags[k_char_idx] = 'M'
+                        char_tags[end_char - 1] = 'E'
+                    elif tag == 'B':
+                        char_tags[start_char] = 'B'
+                        for k_char_idx in range(start_char + 1, end_char):
+                            char_tags[k_char_idx] = 'M'
+                    elif tag == 'M':
+                        # 所有被这个M-token覆盖的字符都标记为M
+                        for k_char_idx in range(start_char, end_char):
+                            char_tags[k_char_idx] = 'M'
+                    elif tag == 'E':
+                        for k_char_idx in range(start_char, end_char - 1):
+                            char_tags[k_char_idx] = 'M'
+                        char_tags[end_char - 1] = 'E'
+        
+        # if sentence == DEBUG_SENTENCE:
+        #     # 旧的 Mapped Character Tags 打印 (基于 word_ids) 已被替换块移除
+        #     print(f"Mapped Character Tags (using offset_mapping): {char_tags}")
+        #     print("-" * 50) # 在所有DEBUG_SENTENCE的打印结束后加一个分隔符
+            # print(f"Char tags: {char_tags}") # 旧的通用打印，可按需恢复
 
             # 根据字符标签进行分词
             result_chars = []
