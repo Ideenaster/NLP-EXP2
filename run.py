@@ -129,7 +129,7 @@ def main(args):
         shuffle=True,
         batch_size=args.batch_size,
         collate_fn=SentenceDataset.collate_fn, # 使用新的collate_fn
-        num_workers=4 # 根据系统调整
+        num_workers=14 # 根据系统调整
     )
 
     test_dataset = SentenceDataset(x_test_raw, y_test_raw, tag2id, tokenizer_name=BERT_MODEL_NAME, max_len=args.max_len)
@@ -138,7 +138,7 @@ def main(args):
         shuffle=False,
         batch_size=args.batch_size,
         collate_fn=SentenceDataset.collate_fn,
-        num_workers=4
+        num_workers=14
     )
     
     t_total = len(train_dataloader) // 1 * args.max_epoch # 1是gradient_accumulation_steps
