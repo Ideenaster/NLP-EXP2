@@ -36,7 +36,9 @@ def infer(args):
     print(f"Loading model from: {args.model_path}...")
     # BertCWS 的构造函数需要 bert_model_name 和 num_labels (即 tagset_size)
     try:
-        loaded_data = torch.load(args.model_path, map_location=device)
+        # PyTorch 2.6+ defaults weights_only to True. Set to False if loading a full model object.
+        # Ensure the model file is from a trusted source.
+        loaded_data = torch.load(args.model_path, map_location=device, weights_only=False)
         if isinstance(loaded_data, BertCWS):
             model = loaded_data
             print("Loaded complete BertCWS model instance.")
