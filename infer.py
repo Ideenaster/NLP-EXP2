@@ -102,7 +102,8 @@ def infer(args):
 
             # c. Post-processing
             # 将预测的标签 ID 序列转换为标签字符串序列
-            predicted_tags = [id2tag[tag_id] for tag_id in predicted_tag_ids.cpu().numpy()]
+            # predicted_tag_ids 是从 CRF decode 出来的 list of ints
+            predicted_tags = [id2tag[tag_id] for tag_id in predicted_tag_ids]
 
             # 关键：将子词级别的标签序列转换回原始词级别的分词结果
             # 我们只关心与原始文本字符对应的 token 的标签
